@@ -85,7 +85,8 @@ def tmdb_params(mood: Optional[str], nostalgia: bool, dial: int) -> dict:
 
 
 def score_movie(m: dict, mood: Optional[str], weather: Optional[str], event: Optional[str],
-                nostalgia: bool, dial: int) -> float:
+                nostalgia: bool, dial: int, preferred_moods: Optional[list[str]] = None,
+                preferred_genres: Optional[list[str]] = None) -> float:
     score = 0.0
     if mood and mood in (m.get("moods") or []):
         score += 3.0
@@ -99,6 +100,16 @@ def score_movie(m: dict, mood: Optional[str], weather: Optional[str], event: Opt
                 score += 0.6
     if nostalgia and 1970 <= (m.get("year") or 2000) <= 1999:
         score += 1.5
+    # Personalization: reward preferred moods & genres from user history
+    if preferred_moods:
+        for pm in preferred_moods:
+            if pm in (m.get("moods") or []):
+                score += 1.1
+    if preferred_genres:
+        movie_genres = set(g.lower() for g in (m.get("genres") or []) if g)
+        for pg in preferred_genres:
+            if pg.lower() in movie_genres:
+                score += 0.9
     # Dial: high dial rewards low popularity, low dial rewards popularity
     pop = m.get("popularity") or 0
     if dial >= 7:
@@ -112,13 +123,18 @@ def score_movie(m: dict, mood: Optional[str], weather: Optional[str], event: Opt
 
 
 def filter_and_rank_mock(catalog: list[dict], mood: Optional[str], weather: Optional[str],
-                         event: Optional[str], nostalgia: bool, dial: int, limit: int = 8) -> list[dict]:
-    scored = [(score_movie(m, mood, weather, event, nostalgia, dial), m) for m in catalog]
+                         event: Optional[str], nostalgia: bool, dial: int, limit: int = 8,
+                         exclude_ids: Optional[list[int]] = None,
+                         preferred_moods: Optional[list[str]] = None,
+                         preferred_genres: Optional[list[str]] = None) -> list[dict]:
+    excl = set(exclude_ids or [])
+    filtered = [m for m in catalog if m["id"] not in excl]
+    scored = [(score_movie(m, mood, weather, event, nostalgia, dial, preferred_moods, preferred_genres), m)
+              for m in filtered]
     scored.sort(key=lambda x: x[0], reverse=True)
     picks = [m for _, m in scored[: limit * 2]]
     if not picks:
-        return catalog[:limit]
-    # dedupe by id
+        return filtered[:limit] or catalog[:limit]
     seen = set()
     out = []
     for m in picks:

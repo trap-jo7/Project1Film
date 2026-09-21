@@ -11,6 +11,7 @@ import VibeControls from "@/components/VibeControls";
 import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { fetchContext, fetchRecommendations, createVibe, fetchVibe } from "@/lib/api";
+import { trackMoodPick, trackMovieOpen, preferences } from "@/lib/history";
 
 function readVibeFromUrl() {
   const p = new URLSearchParams(window.location.search);
@@ -32,9 +33,11 @@ export default function App() {
   const [vibeText, setVibeText] = useState(initialUrl.text);
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [source, setSource] = useState(null);
   const [surprise, setSurprise] = useState(null);
   const [openMovie, setOpenMovie] = useState(null);
+  const [prefsSnapshot, setPrefsSnapshot] = useState(() => preferences());
   const geoRef = useRef({ lat: null, lon: null });
 
   // Auto-detect geo (silent, best-effort)
@@ -62,12 +65,16 @@ export default function App() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const prefs = preferences();
       const { picks, source: src, context: ctx } = await fetchRecommendations({
         mood, vibe_text: vibeText, dial, nostalgia,
         lat: geoRef.current.lat, lon: geoRef.current.lon,
+        preferred_moods: prefs.preferred_moods,
+        preferred_genres: prefs.preferred_genres,
       });
       setMovies(picks || []);
       setSource(src);
+      setPrefsSnapshot(prefs);
       if (ctx) setContext((old) => old || ctx);
     } catch (e) {
       toast.error("Couldn't fetch picks. Please try again.");
@@ -75,6 +82,35 @@ export default function App() {
       setLoading(false);
     }
   }, [mood, dial, nostalgia, vibeText]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const prefs = preferences();
+      const exclude_ids = movies.map((m) => m.id);
+      const { picks } = await fetchRecommendations({
+        mood, vibe_text: vibeText, dial, nostalgia,
+        lat: geoRef.current.lat, lon: geoRef.current.lon,
+        exclude_ids,
+        preferred_moods: prefs.preferred_moods,
+        preferred_genres: prefs.preferred_genres,
+        limit: 8,
+      });
+      // dedupe by id in case backend returns overlaps
+      const existing = new Set(exclude_ids);
+      const fresh = (picks || []).filter((m) => !existing.has(m.id));
+      if (fresh.length === 0) {
+        toast.info("You've reached the bottom of the reel", { description: "Change your mood or dial to unlock more picks." });
+      } else {
+        setMovies((prev) => [...prev, ...fresh]);
+      }
+    } catch (e) {
+      toast.error("Couldn't load more");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [mood, dial, nostalgia, vibeText, movies, loadingMore]);
 
   // First load + reload when key inputs change (debounced)
   useEffect(() => {
@@ -103,6 +139,18 @@ export default function App() {
     if (movies.length === 0) return;
     const pick = movies[Math.floor(Math.random() * movies.length)];
     setSurprise(pick);
+  };
+
+  const handleOpenMovie = (movie) => {
+    trackMovieOpen(movie);
+    setPrefsSnapshot(preferences());
+    setOpenMovie(movie);
+  };
+
+  const handleMoodSelect = (next) => {
+    if (next) trackMoodPick(next);
+    setMood(next);
+    setPrefsSnapshot(preferences());
   };
 
   const heroTitle = nostalgia ? "Rewind to warmer light." : "What are you in the mood for?";
@@ -165,7 +213,7 @@ export default function App() {
         </motion.p>
 
         <div className="mt-8 md:mt-10">
-          <MoodChips selected={mood} onSelect={setMood} />
+          <MoodChips selected={mood} onSelect={handleMoodSelect} />
         </div>
 
         <div className="mt-6 md:mt-8">
@@ -213,8 +261,36 @@ export default function App() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-7" data-testid="movie-grid">
             {movies.map((m, i) => (
-              <MovieCard key={`${m.id}-${i}`} movie={m} index={i} onOpen={setOpenMovie} nostalgia={nostalgia} />
+              <MovieCard key={`${m.id}-${i}`} movie={m} index={i} onOpen={handleOpenMovie} nostalgia={nostalgia} />
             ))}
+          </div>
+        )}
+
+        {/* SEE MORE */}
+        {movies.length > 0 && !loading && (
+          <div className="mt-10 md:mt-14 flex flex-col items-center gap-3">
+            {prefsSnapshot.preferred_moods.length + prefsSnapshot.preferred_genres.length > 0 && (
+              <p className="text-[11px] font-mono-alt uppercase tracking-widest text-purple-300/80"
+                 data-testid="prefs-hint">
+                Tuning for
+                {prefsSnapshot.preferred_moods.slice(0, 2).map((m) => (
+                  <span key={m} className="text-slate-200"> · {m}</span>
+                ))}
+                {prefsSnapshot.preferred_genres.slice(0, 2).map((g) => (
+                  <span key={g} className="text-slate-200"> · {g}</span>
+                ))}
+              </p>
+            )}
+            <button onClick={loadMore}
+                    disabled={loadingMore}
+                    className="inline-flex items-center gap-2 rounded-full glass px-6 py-3 text-sm md:text-base text-slate-100 hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+                    data-testid="see-more-button">
+              {loadingMore ? (
+                <><RefreshCw size={16} className="animate-spin" /> Loading more…</>
+              ) : (
+                <><Sparkles size={16} className="text-purple-300" /> See more picks</>
+              )}
+            </button>
           </div>
         )}
 
@@ -264,7 +340,7 @@ export default function App() {
                 <p className="font-instrument italic text-purple-200 mt-4 text-lg">&ldquo;{surprise.blurb}&rdquo;</p>
               )}
               <div className="mt-5 flex justify-center gap-2">
-                <button onClick={() => { setOpenMovie(surprise); setSurprise(null); }}
+                <button onClick={() => { handleOpenMovie(surprise); setSurprise(null); }}
                         className="rounded-full bg-white text-black px-4 py-2 text-sm font-medium hover:bg-purple-200"
                         data-testid="surprise-open-detail">
                   Tell me more

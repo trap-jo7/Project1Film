@@ -13,8 +13,12 @@ export async function fetchContext(lat, lon) {
   return data;
 }
 
-export async function fetchRecommendations({ mood, vibe_text, dial, nostalgia, lat, lon, limit = 8 }) {
-  const { data } = await api.post("/recommend", { mood, vibe_text, dial, nostalgia, lat, lon, limit });
+export async function fetchRecommendations({ mood, vibe_text, dial, nostalgia, lat, lon, limit = 8,
+                                             exclude_ids = [], preferred_moods = [], preferred_genres = [] }) {
+  const { data } = await api.post("/recommend", {
+    mood, vibe_text, dial, nostalgia, lat, lon, limit,
+    exclude_ids, preferred_moods, preferred_genres,
+  });
   return data;
 }
 

@@ -42,6 +42,9 @@ class RecommendRequest(BaseModel):
     limit: int = 8
     lat: Optional[float] = None
     lon: Optional[float] = None
+    exclude_ids: List[int] = Field(default_factory=list)
+    preferred_moods: List[str] = Field(default_factory=list)
+    preferred_genres: List[str] = Field(default_factory=list)
 
 
 class VibeCreate(BaseModel):
@@ -60,29 +63,36 @@ def _client_ip(request: Request) -> Optional[str]:
 
 
 async def _get_candidates(mood: Optional[str], nostalgia: bool, dial: int, weather: Optional[str],
-                          event: Optional[str], limit: int) -> tuple[list[dict], str]:
+                          event: Optional[str], limit: int, exclude_ids: list[int] | None = None,
+                          preferred_moods: list[str] | None = None,
+                          preferred_genres: list[str] | None = None,
+                          page_offset: int = 0) -> tuple[list[dict], str]:
     """Returns (candidates, source). Falls back to mock catalog if TMDB not configured."""
+    excl = set(exclude_ids or [])
     if tmdb_client.has_key():
         try:
             p = tmdb_params(mood, nostalgia, dial)
-            pages = [1] if dial <= 4 else [1, 2]
+            base_pages = [1, 2] if dial >= 5 else [1]
+            pages = [pg + page_offset for pg in base_pages]
             movies: list[dict] = []
             for pg in pages:
                 movies.extend(await tmdb_client.discover(
                     genre_ids=p["genre_ids"], year_from=p["year_from"], year_to=p["year_to"],
                     min_votes=p["min_votes"], max_votes=p["max_votes"], sort_by=p["sort_by"], page=pg,
                 ))
-            # attach mood hints
             for m in movies:
                 m["moods"] = [mood] if mood else []
             mark_gems(movies)
-            # random-shuffle a bit for freshness
+            movies = [m for m in movies if m["id"] not in excl]
             random.shuffle(movies)
             return movies[: max(limit * 2, 16)], "tmdb"
         except Exception as e:
             logger.warning(f"TMDB failed, falling back: {e}")
 
-    ranked = filter_and_rank_mock(MOCK_MOVIES, mood, weather, event, nostalgia, dial, limit=limit * 2)
+    ranked = filter_and_rank_mock(
+        MOCK_MOVIES, mood, weather, event, nostalgia, dial, limit=limit * 2,
+        exclude_ids=list(excl), preferred_moods=preferred_moods, preferred_genres=preferred_genres,
+    )
     mark_gems(ranked)
     return ranked, "mock"
 
@@ -137,9 +147,12 @@ async def recommend(req: RecommendRequest, request: Request):
     event = cultural_event(now)
     ip = _client_ip(request)
     weather = await weather_client.get_weather(lat=req.lat, lon=req.lon, ip=ip)
-    limit = max(6, min(8, req.limit))
+    limit = max(4, min(12, req.limit))
+    page_offset = min(3, max(0, len(req.exclude_ids) // 8))
     candidates, source = await _get_candidates(
-        req.mood, req.nostalgia, req.dial, weather.get("condition"), event, limit
+        req.mood, req.nostalgia, req.dial, weather.get("condition"), event, limit,
+        exclude_ids=req.exclude_ids, preferred_moods=req.preferred_moods,
+        preferred_genres=req.preferred_genres, page_offset=page_offset,
     )
     picks = await curate(
         candidates=candidates, mood=req.mood, free_text=req.vibe_text, dial=req.dial,

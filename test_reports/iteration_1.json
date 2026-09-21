@@ -1,0 +1,45 @@
+{
+  "summary": "First-finish latency smoke test for MoodReel. Backend: all 7 endpoints (health, context, recommend x3, movie, vibe POST+GET) return 200 with expected fields and mock catalog fallback works. LLM blurbs are present on picks (Claude Haiku 4.5 via EMERGENT_LLM_KEY). Frontend: landing renders logo, hero, context badge, 8 mood chips, vibe input, obscure dial, nostalgia toggle. Movie grid populates with 8 cards. Mood chip click, refresh, share (URL with ?v= copied to clipboard), Surprise Me overlay + Reroll, movie modal + close, dial change (labels shift to Buried Treasure) and nostalgia toggle activation all work. Zero console errors.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/health -> 200 {tmdb:false, weather:false, llm:true}",
+    "GET /api/context -> 200 with weather.available=false, time_of_day, trending_titles, now",
+    "POST /api/recommend {mood:cozy,dial:5} -> 200, 8 picks, source=mock, each pick has id/title/year/rating/poster/blurb",
+    "POST /api/recommend {mood:nostalgic,dial:8,nostalgia:true} -> 8 picks skewed to 80s-90s and lower vote counts (Whisper of the Heart 1995, Kiki 1989, Stand by Me 1986)",
+    "POST /api/recommend {vibe_text:'a rainy Sunday alone',dial:6} -> 8 relevant picks",
+    "GET /api/movie/12762 -> 200 Whisper of the Heart 1995",
+    "POST /api/vibe + GET /api/vibe/{id} -> 200 round-trip with mood/vibe_text/dial/nostalgia payload preserved",
+    "Frontend: 8 mood chips visible with correct data-testid ids",
+    "Frontend: vibe-input, obscure-dial, nostalgia-toggle all visible/functional",
+    "Frontend: movie grid renders 8 cards with LLM blurbs (e.g., Perfect Blue blurb visible)",
+    "Frontend: clicking mood-chip-cozy triggers /recommend re-fetch",
+    "Frontend: movie-modal opens with content and modal-close-button closes it",
+    "Frontend: surprise-overlay opens; Reroll updates the shown movie",
+    "Frontend: refresh-button triggers new picks",
+    "Frontend: Share copies URL containing ?v=<id>&dial=5 to clipboard; toast element rendered",
+    "Frontend: obscure dial adjustment triggers /recommend (debounced); title/label updates to 'Buried Treasure'",
+    "Frontend: nostalgia toggle activates (hero copy shifts to 'Rewind to warmer light', re-fetch triggered)",
+    "Frontend: 0 console errors during full flow"
+  ],
+  "failed": [
+    {
+      "area": "frontend/UX",
+      "issue": "Sepia filter not detected on <img> elements when Nostalgia Mode is toggled ON. Sepia may be applied via wrapper element/CSS variable rather than the img filter, or the check ran during a skeleton reload. Toggle itself activates visually and content changes correctly.",
+      "evidence": "page.evaluate scan of all <img> computed styles found no filter containing 'sepia'; no elements with class matching 'sepia'. UI clearly shows nostalgia mode ON in screenshot.",
+      "priority": "LOW"
+    },
+    {
+      "area": "frontend/UX",
+      "issue": "Pressing Escape does not close the Surprise Me overlay. Users may not have an obvious way to dismiss it besides Reroll (no close (x) button observed inside overlay).",
+      "evidence": "After overlay opened, page.keyboard.press('Escape') did not dismiss it; subsequent click on Refresh button was intercepted by the surprise-overlay div.",
+      "priority": "MEDIUM"
+    }
+  ],
+  "action_items": [
+    "Optional: Confirm the sepia effect implementation — apply CSS filter directly on poster <img> (or a testable wrapper class like 'sepia') so it is visually obvious and easily verified.",
+    "Add an Escape-to-close handler and/or a visible close (x) button to the Surprise Me overlay (data-testid='surprise-overlay') for better UX."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "~93%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
