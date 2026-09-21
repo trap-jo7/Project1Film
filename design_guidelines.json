@@ -1,0 +1,101 @@
+{
+  "theme": "Dark Cinematic & Experimental (#0B0B10 base with Deep Purple -> Oxblood -> Black gradients)",
+  "context": "Film lovers discovery tool with Letterboxd-adjacent moody aesthetic, liquid glass panels, glowing orbs, and hidden gem curation",
+  "typography": {
+    "heading_font": "Playfair Display, Cormorant Garamond, serif",
+    "subheading_font": "Cabinet Grotesk, Syne, sans-serif",
+    "body_font": "Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight font-serif text-slate-100",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight font-serif text-slate-100",
+      "h3": "text-xl sm:text-2xl font-medium tracking-snug text-slate-200",
+      "h4": "text-lg sm:text-xl font-medium text-slate-300",
+      "body": "text-base text-slate-300 leading-relaxed font-sans",
+      "label_mono": "text-xs font-mono uppercase tracking-widest text-purple-300/80"
+    }
+  },
+  "colors": {
+    "background_base": "#0B0B10",
+    "background_card": "rgba(255, 255, 255, 0.03)",
+    "background_card_hover": "rgba(255, 255, 255, 0.06)",
+    "gradient_hero": "radial-gradient(circle at 50% -20%, #3B0764 0%, #4C0519 45%, #0B0B10 100%)",
+    "gradient_oxblood_purple": "linear-gradient(135deg, rgba(88, 28, 135, 0.4) 0%, rgba(76, 5, 25, 0.4) 100%)",
+    "accent_primary": "#E11D48",
+    "accent_purple": "#A855F7",
+    "accent_gold": "#F59E0B",
+    "accent_emerald": "#10B981",
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#94A3B8",
+    "text_muted": "#64748B",
+    "border_glass": "rgba(255, 255, 255, 0.08)",
+    "border_glass_active": "rgba(168, 85, 247, 0.4)"
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-white/[0.03] border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]",
+    "dot_grid": "background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px); background-size: 24px 24px;",
+    "radial_orbs": "Floating blurred circular gradients (#581C87 & #881337) placed with absolute positioning, blur-3xl opacity-40 animate-pulse",
+    "poster_card": "aspect-[2/3] rounded-xl overflow-hidden shadow-2xl transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 hover:shadow-purple-900/40 hover:border-purple-500/30",
+    "nostalgia_overlay": "Grainy sepia vintage filter effect with warm vignette and subtle scanlines when Nostalgia Mode is toggled ON",
+    "custom_cursor_glow": "Subtle purple/crimson radial glow circle following mouse cursor on desktop viewport"
+  },
+  "layout_and_grids": {
+    "hero_layout": "Full width dark hero section with central cinematic typography, floating orbs, dot grid background, auto weather/context badge, and quick mood selector",
+    "movie_grid": "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8 max-w-7xl mx-auto px-4 py-8",
+    "controls_bento": "Glassmorphism bento grid for Vibe Input, Mainstream-to-Obscure dial, Context badge, and Filter toggles"
+  },
+  "components": {
+    "mood_chips": {
+      "items": [
+        {"id": "nostalgic", "label": "Nostalgic", "emoji": "🕯️", "sparkle": true},
+        {"id": "cozy", "label": "Cozy", "emoji": "🍿", "sparkle": false},
+        {"id": "chaotic", "label": "Chaotic", "emoji": "⚡", "sparkle": false},
+        {"id": "melancholy", "label": "Melancholy", "emoji": "🌧️", "sparkle": false},
+        {"id": "euphoric", "label": "Euphoric", "emoji": "🌌", "sparkle": false},
+        {"id": "weird", "label": "Weird", "emoji": "👁️", "sparkle": false},
+        {"id": "romantic", "label": "Romantic", "emoji": "🌹", "sparkle": false},
+        {"id": "angry", "label": "Angry", "emoji": "🔥", "sparkle": false}
+      ],
+      "style": "pills with soft border glass, selected state glows in purple/oxblood with subtle scale transformation"
+    },
+    "movie_card": {
+      "features": ["Poster 2:3 ratio", "Hidden Gem badge with sparkle icon", "LLM Mood Blurb in serif quote style", "Match percentage & Vibe tags", "Quick detail opener"],
+      "test_id_prefix": "movie-card"
+    },
+    "detail_modal": {
+      "features": ["Trailer embed placeholder / video backdrop", "Where to watch streaming availability badges", "Cast & Director metadata", "Letterboxd-style rating breakdown", "Similar vibe recommendations"],
+      "test_id_prefix": "movie-modal"
+    },
+    "controls": {
+      "vibe_input": "Large liquid glass input with search button & AI magic prompt hints",
+      "obscure_slider": "Mainstream (1) ↔ Deep Cut Hidden Gem (10) custom styled range slider",
+      "context_badge": "Live weather icon + local time + trending cultural event tag",
+      "surprise_button": "Surprise Me single card reveal modal with roulette animation"
+    }
+  },
+  "image_urls": {
+    "hero_backdrop": "https://images.unsplash.com/photo-1614201842267-206a09286c3b?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "cinema_vibes": [
+      "https://images.unsplash.com/photo-1678140156938-3edd46de86ef?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "https://images.unsplash.com/photo-1643905962365-efaead921d34?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "https://images.pexels.com/photos/13932609/pexels-photo-13932609.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "https://images.pexels.com/photos/5504137/pexels-photo-5504137.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure dark background #0B0B10 is used universally with liquid glass overlays",
+    "Implement dot grid background using pure Tailwind/CSS overlay on hero",
+    "Ensure all interactive elements have explicit data-testid attributes (e.g. data-testid='mood-chip-nostalgic', data-testid='vibe-input', data-testid='slider-obscure', data-testid='movie-card-1', data-testid='modal-close-button')",
+    "Build hybrid engine with realistic mock fallback data plus direct backend LLM endpoint integration",
+    "Keep maximum 2 visual effects per screen to prevent over-clutter",
+    "Use Sonner for toast notifications when user copies vibe link or switches nostalgia mode",
+    "Integrate trailer view modal, where-to-watch tags, rating pills, and obscure-meter badge"
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Never use generic centered plain layouts or Inter/Space Grotesk for main titles",
+    "Ensure high text contrast against dark backgrounds and semi-transparent glass cards",
+    "Always specify hover states with explicit text colors (hover:text-white hover:bg-white/10)",
+    "Do not add transparent backgrounds without backdrop-blur on dropdowns or modals",
+    "Add data-testid attributes to buttons, inputs, links, tabs, sliders, and cards for automated testing"
+  ]
+}
