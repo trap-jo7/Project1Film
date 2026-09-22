@@ -35,6 +35,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [source, setSource] = useState(null);
+  const [noMatches, setNoMatches] = useState(false);
+  const [keywordMatched, setKeywordMatched] = useState(false);
   const [surprise, setSurprise] = useState(null);
   const [openMovie, setOpenMovie] = useState(null);
   const [prefsSnapshot, setPrefsSnapshot] = useState(() => preferences());
@@ -66,14 +68,17 @@ export default function App() {
     setLoading(true);
     try {
       const prefs = preferences();
-      const { picks, source: src, context: ctx } = await fetchRecommendations({
+      const resp = await fetchRecommendations({
         mood, vibe_text: vibeText, dial, nostalgia,
         lat: geoRef.current.lat, lon: geoRef.current.lon,
         preferred_moods: prefs.preferred_moods,
         preferred_genres: prefs.preferred_genres,
       });
+      const { picks, source: src, context: ctx, keyword_matched, no_matches } = resp;
       setMovies(picks || []);
       setSource(src);
+      setKeywordMatched(!!keyword_matched);
+      setNoMatches(!!no_matches);
       setPrefsSnapshot(prefs);
       if (ctx) setContext((old) => old || ctx);
     } catch (e) {
@@ -231,7 +236,7 @@ export default function App() {
         <div className="flex items-end justify-between mb-6 md:mb-8">
           <div>
             <div className="text-[11px] font-mono-alt uppercase tracking-widest text-purple-300 mb-1">
-              {source === "mock" ? "Curated Sample" : "The Reel"}
+              {keywordMatched && vibeText ? `Matches for "${vibeText}"` : source === "mock" ? "Curated Sample" : "The Reel"}
             </div>
             <h2 className="font-serif-editorial text-2xl md:text-3xl tracking-tight text-white">
               {mood ? <>Cinema for a <span className="italic text-purple-200">{mood}</span> hour</> : "Tonight's picks"}
@@ -253,10 +258,25 @@ export default function App() {
             ))}
           </div>
         ) : movies.length === 0 ? (
-          <div className="glass rounded-2xl p-10 text-center">
+          <div className="glass rounded-2xl p-10 text-center" data-testid="empty-state">
             <Sparkles className="mx-auto text-purple-300" size={22} />
-            <p className="mt-3 font-serif-editorial text-xl">No films match that vibe.</p>
-            <p className="text-slate-400 mt-1 text-sm">Try loosening the dial or picking a different mood.</p>
+            <p className="mt-3 font-serif-editorial text-xl">
+              {noMatches && vibeText
+                ? <>Nothing in the reel matches &ldquo;<span className="italic text-purple-200">{vibeText}</span>&rdquo;.</>
+                : "No films match that vibe."}
+            </p>
+            <p className="text-slate-400 mt-1 text-sm">
+              {noMatches && vibeText
+                ? "Try a different keyword or clear the search to browse by mood."
+                : "Try loosening the dial or picking a different mood."}
+            </p>
+            {vibeText && (
+              <button onClick={() => { setVibeText(""); }}
+                      className="mt-4 rounded-full border border-white/15 px-4 py-1.5 text-xs text-slate-200 hover:bg-white/[0.06]"
+                      data-testid="clear-search-button">
+                Clear search
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-7" data-testid="movie-grid">

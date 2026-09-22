@@ -1,5 +1,6 @@
 """Rules-based candidate filter. Maps mood + weather + time + dial to TMDB parameters
 and scores/filters our mock catalog when TMDB is unavailable."""
+import re
 from typing import Optional
 
 MOOD_GENRE_TMDB = {
@@ -82,6 +83,64 @@ def tmdb_params(mood: Optional[str], nostalgia: bool, dial: int) -> dict:
         "max_votes": max_votes,
         "sort_by": sort_by,
     }
+
+
+def keyword_score(m: dict, tokens: list[str]) -> float:
+    """Return keyword match score for a movie. 0 = no match."""
+    if not tokens:
+        return 0.0
+    haystacks = [
+        (m.get("title") or "").lower(),
+        (m.get("overview") or "").lower(),
+        " ".join((m.get("genres") or [])).lower(),
+        " ".join((m.get("moods") or [])).lower(),
+        " ".join((m.get("keywords") or [])).lower(),
+    ]
+    hay = " || ".join(haystacks)
+    score = 0.0
+    for tok in tokens:
+        if not tok:
+            continue
+        t = tok.lower().strip()
+        if len(t) < 3:
+            continue
+        if t in haystacks[0]:
+            score += 5.0
+        if t in haystacks[4]:  # keywords field is the highest signal
+            score += 4.0
+        if t in haystacks[2] or t in haystacks[3]:
+            score += 2.0
+        if t in haystacks[1]:
+            score += 1.5
+        # crude plural / stem: "vampires" -> "vampire"
+        if t.endswith("s") and t[:-1] in hay and t not in hay:
+            score += 2.0
+    return score
+
+
+_STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "for", "with", "to", "of", "in", "on", "at",
+    "movie", "movies", "film", "films", "give", "me", "want", "watch", "something",
+    "please", "im", "i'm", "feeling", "feel", "kind", "type", "some", "any",
+}
+
+
+def tokenize_query(q: str) -> list[str]:
+    if not q:
+        return []
+    q = q.lower()
+    parts = re.findall(r"[a-z][a-z'-]+", q)
+    return [p for p in parts if p not in _STOPWORDS and len(p) >= 3]
+
+
+def filter_by_keywords(catalog: list[dict], query: str, limit: int = 24) -> list[dict]:
+    tokens = tokenize_query(query)
+    if not tokens:
+        return []
+    scored = [(keyword_score(m, tokens), m) for m in catalog]
+    scored = [(s, m) for s, m in scored if s > 0]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [m for _, m in scored[:limit]]
 
 
 def score_movie(m: dict, mood: Optional[str], weather: Optional[str], event: Optional[str],

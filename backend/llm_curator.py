@@ -13,12 +13,14 @@ SYSTEM = """You are MoodReel's cinema tastemaker. You curate a short list of mov
 Rules:
 - Output STRICT JSON only. No preamble, no markdown fences.
 - Pick 6 to 8 movies from the candidates provided. Do not invent movies.
+- If the user provided FREE_TEXT (a specific request like "vampire movie", "space heist", "underwater horror"), the FREE_TEXT is the STRONGEST signal — filter aggressively so every pick clearly matches those keywords/theme. Drop candidates that don't fit even if they match the mood.
+- If NO candidate matches the FREE_TEXT well, return {"picks": [], "reason": "no matches"} so the app can tell the user honestly.
 - Each blurb: 1 sentence, 12-24 words, second-person ("you"), specific and evocative. No cliches like "must watch" or "masterpiece".
 - Slightly favor hidden gems when the user's obscure dial is high.
 - Never mention the dial, the weather, or the mood by name inside the blurb.
 
 Schema:
-{"picks": [{"id": <int>, "blurb": "<string>"}]}"""
+{"picks": [{"id": <int>, "blurb": "<string>"}], "reason": "<optional string when picks is empty>"}"""
 
 
 def _fallback_blurb(m: dict, mood: Optional[str]) -> str:
@@ -67,9 +69,10 @@ async def curate(candidates: list[dict], mood: Optional[str], free_text: Optiona
             "genres": c.get("genres", [])[:3],
             "rating": c.get("rating"),
             "gem": c.get("gem", False),
+            "keywords": c.get("keywords", []),
             "overview": (c.get("overview") or "")[:220],
         }
-        for c in candidates[:20]
+        for c in candidates[:24]
     ]
 
     if not key or not candidates:

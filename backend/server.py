@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 from mock_data import MOCK_MOVIES, all_moods
-from rules_engine import tmdb_params, filter_and_rank_mock, mark_gems, dial_to_votes
+from rules_engine import tmdb_params, filter_and_rank_mock, mark_gems, dial_to_votes, filter_by_keywords, tokenize_query
 from llm_curator import curate
 from context import cultural_event, time_of_day
 import tmdb_client
@@ -66,35 +66,55 @@ async def _get_candidates(mood: Optional[str], nostalgia: bool, dial: int, weath
                           event: Optional[str], limit: int, exclude_ids: list[int] | None = None,
                           preferred_moods: list[str] | None = None,
                           preferred_genres: list[str] | None = None,
-                          page_offset: int = 0) -> tuple[list[dict], str]:
-    """Returns (candidates, source). Falls back to mock catalog if TMDB not configured."""
+                          page_offset: int = 0,
+                          vibe_text: Optional[str] = None) -> tuple[list[dict], str, bool]:
+    """Returns (candidates, source, keyword_matched). Uses keyword search when vibe_text is present."""
     excl = set(exclude_ids or [])
+    tokens = tokenize_query(vibe_text or "")
+
     if tmdb_client.has_key():
         try:
-            p = tmdb_params(mood, nostalgia, dial)
-            base_pages = [1, 2] if dial >= 5 else [1]
-            pages = [pg + page_offset for pg in base_pages]
             movies: list[dict] = []
-            for pg in pages:
-                movies.extend(await tmdb_client.discover(
-                    genre_ids=p["genre_ids"], year_from=p["year_from"], year_to=p["year_to"],
-                    min_votes=p["min_votes"], max_votes=p["max_votes"], sort_by=p["sort_by"], page=pg,
-                ))
+            if tokens:
+                # Prefer TMDB search when we have a free-text query
+                try:
+                    search_hits = await tmdb_client.search(" ".join(tokens))
+                    movies.extend(search_hits)
+                except Exception as e:
+                    logger.warning(f"TMDB search failed: {e}")
+            if not movies:
+                p = tmdb_params(mood, nostalgia, dial)
+                base_pages = [1, 2] if dial >= 5 else [1]
+                pages = [pg + page_offset for pg in base_pages]
+                for pg in pages:
+                    movies.extend(await tmdb_client.discover(
+                        genre_ids=p["genre_ids"], year_from=p["year_from"], year_to=p["year_to"],
+                        min_votes=p["min_votes"], max_votes=p["max_votes"], sort_by=p["sort_by"], page=pg,
+                    ))
             for m in movies:
                 m["moods"] = [mood] if mood else []
             mark_gems(movies)
             movies = [m for m in movies if m["id"] not in excl]
-            random.shuffle(movies)
-            return movies[: max(limit * 2, 16)], "tmdb"
+            if not tokens:
+                random.shuffle(movies)
+            return movies[: max(limit * 2, 16)], "tmdb", bool(tokens)
         except Exception as e:
             logger.warning(f"TMDB failed, falling back: {e}")
+
+    # Mock catalog path
+    if tokens:
+        kw_hits = filter_by_keywords(MOCK_MOVIES, vibe_text, limit=limit * 3)
+        kw_hits = [m for m in kw_hits if m["id"] not in excl]
+        if kw_hits:
+            mark_gems(kw_hits)
+            return kw_hits[: limit * 2], "mock", True
 
     ranked = filter_and_rank_mock(
         MOCK_MOVIES, mood, weather, event, nostalgia, dial, limit=limit * 2,
         exclude_ids=list(excl), preferred_moods=preferred_moods, preferred_genres=preferred_genres,
     )
     mark_gems(ranked)
-    return ranked, "mock"
+    return ranked, "mock", False
 
 
 # ------------------ ROUTES ------------------
@@ -149,10 +169,11 @@ async def recommend(req: RecommendRequest, request: Request):
     weather = await weather_client.get_weather(lat=req.lat, lon=req.lon, ip=ip)
     limit = max(4, min(12, req.limit))
     page_offset = min(3, max(0, len(req.exclude_ids) // 8))
-    candidates, source = await _get_candidates(
+    candidates, source, kw_matched = await _get_candidates(
         req.mood, req.nostalgia, req.dial, weather.get("condition"), event, limit,
         exclude_ids=req.exclude_ids, preferred_moods=req.preferred_moods,
         preferred_genres=req.preferred_genres, page_offset=page_offset,
+        vibe_text=req.vibe_text,
     )
     picks = await curate(
         candidates=candidates, mood=req.mood, free_text=req.vibe_text, dial=req.dial,
@@ -161,6 +182,8 @@ async def recommend(req: RecommendRequest, request: Request):
     return {
         "picks": picks,
         "source": source,
+        "keyword_matched": kw_matched,
+        "no_matches": bool(req.vibe_text) and len(picks) == 0,
         "context": {"weather": weather, "time_of_day": tod, "event": event},
     }
 

@@ -91,6 +91,12 @@ async def trending_week() -> list[dict]:
     return [_shape(m) for m in data.get("results", [])]
 
 
+async def search(query: str, page: int = 1) -> list[dict]:
+    data = await _get("/search/movie", {"query": query, "language": "en-US",
+                                        "include_adult": "false", "page": page})
+    return [_shape(m) for m in data.get("results", []) if m.get("poster_path")]
+
+
 async def details(movie_id: int) -> dict:
     data = await _get(f"/movie/{movie_id}", {"append_to_response": "videos,credits,watch/providers", "language": "en-US"})
     shaped = _shape(data)
